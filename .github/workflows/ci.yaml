@@ -54,7 +54,7 @@ jobs:
             mozilla/remote-settings
       - name: Create collection
         run: |
-          curl -X PUT http://localhost:8888/v1/buckets/main-workspace/collections/product-integrity
+          curl -X PUT http://localhost:8888/v1/buckets/main-workspace/collections/vpn-serverlist
 
       - name: Run job from container
         run: |
@@ -63,4 +63,8 @@ jobs:
             cronjob:test
 
       - name: Run job from source
-        run: make start
+        run: make start | tee output.log
+        shell: bash
+
+      - name: Check that a second run is a no-op
+        run: grep "Records are in sync" output.log
