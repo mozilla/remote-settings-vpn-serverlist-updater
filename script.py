@@ -2,10 +2,20 @@ import os
 import sys
 
 import kinto_http
-import requests
 import sentry_sdk
 from kinto_http.utils import collection_diff
 from sentry_sdk.integrations.gcp import GcpIntegration
+
+from src.fastly import fetch_fastly, validate_fastly_data
+from src.records import validate_stored_records
+from src.transform import (
+    add_legacy_filter_expressions,
+    assign_ids,
+    drop_unsynced_locations,
+    fastly_to_kinto,
+    one_location_per_country,
+)
+from src.util import pipe
 
 
 AUTHORIZATION = os.getenv("AUTHORIZATION", "")
@@ -26,21 +36,26 @@ SENTRY_DSN = os.getenv("SENTRY_DSN")
 SENTRY_ENV = os.getenv("SENTRY_ENV", ENVIRONMENT)
 
 
-COLLECTION_NAME = "product-integrity"
+COLLECTION_NAME = "vpn-serverlist"
 
 
 def get_source_records():
     """
-    Function that turns the source of truth data into Remote Settings records.
-    Write your own...
+    Turn the Fastly VPN locations into `vpn-serverlist` records.
+    Raises if the Fastly response does not match the expected schema, which aborts the
+    sync before anything is written (and reports the error to Sentry).
     """
-    resp = requests.get("https://product-details.mozilla.org/1.0/firefox_versions.json")
-    details = resp.json()
-    return [
-        {"id": "release", "version": details["LATEST_FIREFOX_VERSION"]},
-        {"id": "beta", "version": details["FIREFOX_DEVEDITION"]},
-        {"id": "esr", "version": details["FIREFOX_ESR"]},
-    ]
+    return pipe(
+        fetch_fastly(),
+        validate_fastly_data,
+        # "closest" is validated, but its REC record is maintained in Remote Settings.
+        drop_unsynced_locations,
+        one_location_per_country,
+        fastly_to_kinto,
+        # Fastly has no filter expressions: put back the ones live records are gated by
+        # (the US record targets Firefox >= 151), so that they still match.
+        add_legacy_filter_expressions,
+    )
 
 
 def main():
@@ -72,15 +87,18 @@ def main():
     source_records = get_source_records()
     print("✅")
 
-    # Get current destination records.
+    # Get current destination records. Abort if one carries a field the job does not model,
+    # since updating it would erase that field (the error is reported to Sentry).
     print("Fetch current destination records...", end="")
-    dest_records = client.get_records()
+    dest_records = validate_stored_records(client.get_records())
     print("✅")
 
-    # Create or update the destination records.
-    to_create, to_update, to_delete = collection_diff(source_records, dest_records)
+    # Create or update the destination records. Records that only exist on the server (e.g. the
+    # US "CatchAll Anycast") are maintained by hand, and are never deleted.
+    desired_records = assign_ids(source_records, dest_records)
+    to_create, to_update, _ = collection_diff(desired_records, dest_records)
 
-    has_pending_changes = to_create or to_update or to_delete
+    has_pending_changes = to_create or to_update
     if not has_pending_changes:
         print("Records are in sync. Nothing to do ✅.")
         return os.EX_OK
@@ -96,8 +114,6 @@ def main():
             # Let the server assign a new timestamp.
             new.pop("last_modified", None)
             batch.update_record(data=new)
-        for r in to_delete:
-            batch.delete_record(id=r["id"])
     ops_count = len(batch.results())
     print(f"{ops_count} operations ✅")
 
