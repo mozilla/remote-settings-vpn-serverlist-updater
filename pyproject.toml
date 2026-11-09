@@ -1,26 +1,26 @@
 [project]
 name = "rs-script"
 version = "0.1.0"
-description = "A minimal Remote Settings cronjob script"
-authors = [
-    {name = "Your Name", email = "you@example.com"},
-]
+description = "Sync the Fastly VPN locations into the vpn-serverlist Remote Settings collection"
 license = {text = "MPLv2"}
 requires-python = "<4.0,>=3.12"
 dependencies = [
+    "jsonschema<5.0.0,>=4.26.0",
     "kinto-http<12.0.0,>=11.8.0",
-    "pytest<9.0.0,>=8.4.0",
+    "pycountry<27.0.0,>=26.2.16",
+    "requests<3.0.0,>=2.32.3",
     "sentry-sdk<3.0.0,>=2.29.1",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest<9.0.0,>=8.4.0",
     "ruff<1.0.0,>=0.11.12",
 ]
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 99

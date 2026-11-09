@@ -37,6 +37,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SERVER: "http://localhost:8888/v1"
+    services:
+      remote-settings:
+        image: mozilla/remote-settings
+        env:
+          KINTO_INI: config/testing.ini
+        ports:
+          - 8888:8888
+        options: >-
+          --health-cmd "curl --fail --silent http://localhost:8888/v1/__heartbeat__"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -46,15 +58,9 @@ jobs:
       - name: Build ingestion job container
         run:
           docker build -t cronjob:test .
-      - name: Run local Remote Settings server
-        run: |
-          docker run --detach \
-            --network=host \
-            --env KINTO_INI=config/testing.ini \
-            mozilla/remote-settings
       - name: Create collection
         run: |
-          curl -X PUT http://localhost:8888/v1/buckets/main-workspace/collections/product-integrity
+          curl --fail -X PUT http://localhost:8888/v1/buckets/main-workspace/collections/vpn-serverlist
 
       - name: Run job from container
         run: |
@@ -63,4 +69,8 @@ jobs:
             cronjob:test
 
       - name: Run job from source
-        run: make start
+        run: make start | tee output.log
+        shell: bash
+
+      - name: Check that a second run is a no-op
+        run: grep "Records are in sync" output.log

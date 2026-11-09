@@ -14,13 +14,13 @@ $(INSTALL_STAMP): pyproject.toml uv.lock  ## Install dependencies
 
 .PHONY: format
 format: $(INSTALL_STAMP)  ## Format code base
-	$(UV) run ruff check --fix *.py
-	$(UV) run ruff format *.py
+	$(UV) run ruff check --fix .
+	$(UV) run ruff format .
 
 .PHONY: lint
 lint: $(INSTALL_STAMP)  ## Analyze code base
-	$(UV) run ruff check *.py
-	$(UV) run ruff format --check *.py
+	$(UV) run ruff check .
+	$(UV) run ruff format --check .
 
 .PHONY: start
 start: $(INSTALL_STAMP)  ## Start the script
@@ -28,4 +28,4 @@ start: $(INSTALL_STAMP)  ## Start the script
 
 .PHONY: test
 test: $(INSTALL_STAMP)  ## Unit tests
-	$(UV) run py.test test.py
+	$(UV) run pytest
