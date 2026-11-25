@@ -11,6 +11,7 @@ from src.records import validate_stored_records
 from src.transform import (
     add_legacy_filter_expressions,
     assign_ids,
+    drop_excluded_countries,
     drop_unsynced_locations,
     fastly_to_kinto,
     one_location_per_country,
@@ -50,6 +51,7 @@ def get_source_records():
         validate_fastly_data,
         # "closest" is validated, but its REC record is maintained in Remote Settings.
         drop_unsynced_locations,
+        drop_excluded_countries,
         one_location_per_country,
         fastly_to_kinto,
         # Fastly has no filter expressions: put back the ones live records are gated by

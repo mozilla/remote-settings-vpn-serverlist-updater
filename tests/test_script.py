@@ -159,6 +159,17 @@ def test_closest_does_not_create_missing_recommended_record(
     mocked_client.request_review.assert_not_called()
 
 
+def test_source_records_drop_excluded_countries(mocked_fastly):
+    mocked_fastly.return_value = [
+        fastly_entry("de", "DE", "Germany"),
+        fastly_entry("yyz1", "CA", "Toronto"),
+        fastly_entry("yul2", "CA", "Montreal"),
+    ]
+
+    with mock.patch("src.transform.EXCLUDED_COUNTRY_CODES", frozenset({"CA"})):
+        assert [record["code"] for record in script.get_source_records()] == ["DE"]
+
+
 def test_outdated(mocked_client, mocked_fastly, batch_client, capsys):
     mocked_fastly.return_value = [
         fastly_entry("de", "DE", "Germany"),

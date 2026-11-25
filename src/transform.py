@@ -8,6 +8,8 @@ from .records import record_key
 # Every server entry uses this port; Fastly does not provide one.
 KINTO_SERVER_PORT = 2499
 
+EXCLUDED_COUNTRY_CODES = frozenset({"HK"})
+
 # Filter expressions that must be carried on a country's record for historical reasons:
 # the live US record is gated to recent app versions.
 LEGACY_FILTER_EXPRESSIONS = {
@@ -37,6 +39,11 @@ def drop_unsynced_locations(servers):
     "closest", whose `REC` record is maintained in Remote Settings.
     """
     return [s for s in servers if s["id"] not in UNSYNCED_LOCATIONS]
+
+
+def drop_excluded_countries(servers):
+    """Drop locations whose country code is excluded from the sync."""
+    return [s for s in servers if s["country"] not in EXCLUDED_COUNTRY_CODES]
 
 
 def one_location_per_country(servers):
